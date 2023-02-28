@@ -1,0 +1,58 @@
+version: '3.7'
+
+services:
+  zookeeper:
+    image: wurstmeister/zookeeper
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - '2181:2181'
+    networks:
+      - my_network
+  kafka:
+    image: wurstmeister/kafka
+    depends_on:
+      - zookeeper
+    container_name: kafka
+    ports:
+      - 9092:9092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_LISTENERS: INTERNAL://:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_HOST_NAME: localhost
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    networks:
+      - my_network
+  my-api:
+    container_name: my-api
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: my-api
+    environment:
+      - PORT=3000
+      - REDIS_HOST=my-redis
+      - REDIS_PORT=6379
+    expose:
+      - '3000'
+    links:
+      - my-redis
+    ports:
+      - '3000:3000'
+    networks:
+      - my_network
+    volumes:
+      - ./src:/usr/src/app/src
+      - ./test:/usr/src/app/test
+    depends_on:
+      - my-redis
+    command: npm run dev:serve
+networks:
+  my_network:
+    driver: bridge
